@@ -1,0 +1,257 @@
+<h3 class="mb-4">Available Jobs</h3>
+
+<!-- Filters Section -->
+<div class="card mb-4 p-3 shadow-sm">
+  <form id="filterForm" class="row g-3">
+    <div class="col-md-4">
+      <input type="text" id="searchInput" class="form-control" placeholder="Search by job title or keyword">
+    </div>
+    <div class="col-md-3">
+      <input type="text" id="locationInput" class="form-control" placeholder="Location">
+    </div>
+    <div class="col-md-3">
+      <select id="jobTypeFilter" class="form-select">
+        <option value="">All Job Types</option>
+        <option value="Full-Time">Full-Time</option>
+        <option value="Part-Time">Part-Time</option>
+        <option value="Internship">Internship</option>
+      </select>
+    </div>
+    <div class="col-md-2 d-grid">
+      <button type="submit" class="btn btn-primary">Filter</button>
+    </div>
+  </form>
+</div>
+
+<!-- Job List -->
+<div id="jobsRow" class="row row-cols-1 row-cols-md-2 g-4"></div>
+
+<!-- Toast Notification -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+  <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="toast-header">
+      <strong class="me-auto">Notification</strong>
+      <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body" id="toastMessage"></div>
+  </div>
+</div>
+
+<!-- Apply Modal -->
+<div class="modal fade" id="applyModal" tabindex="-1" aria-labelledby="applyModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form id="applyForm" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="applyModalLabel">Apply for Job</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="selectedJobId">
+        <div class="mb-3">
+          <label for="linkedinId" class="form-label">Your LinkedIn ID</label>
+          <input type="text" class="form-control" id="linkedinId" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-success" id="submitBtn">
+          Submit Application
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+  let jobs = [], allUsers = [];
+  const toastLive = document.getElementById('liveToast');
+  const toast = new bootstrap.Toast(toastLive);
+
+  function showToast(message, isError = false) {
+    const toastBody = document.getElementById('toastMessage');
+    toastBody.textContent = message;
+    toastBody.className = isError ? 'toast-body text-danger' : 'toast-body text-success';
+    toast.show();
+  }
+
+  function loadData() {
+    const currentUserId = localStorage.getItem("userId");
+    if (!currentUserId) {
+      showToast("Please login to view jobs", true);
+      window.location.href = "login.html";
+      return;
+    }
+
+    Promise.all([
+      fetch('http://localhost:8080/api/postjob').then(r => {
+        if (!r.ok) throw new Error('Failed to load jobs');
+        return r.json();
+      }),
+      fetch('http://localhost:8080/api').then(r => {
+        if (!r.ok) throw new Error('Failed to load users');
+        return r.json();
+      })
+    ])
+      .then(([jobData, userData]) => {
+        jobs = Array.isArray(jobData) ? jobData : [];
+        allUsers = Array.isArray(userData) ? userData : [];
+        renderJobs(jobs);
+      })
+      .catch(error => {
+        console.error("Error loading data:", error);
+        showToast(error.message, true);
+      });
+  }
+
+  function getCompanyByUserId(userId) {
+    const user = allUsers.find(u => String(u.userId) === String(userId) && u.userType === "ADMIN");
+    return user || {};
+  }
+
+  function renderJobs(list) {
+    const $row = $('#jobsRow').empty();
+    if (!list.length) {
+      $row.append('<div class="col-12"><div class="alert alert-info">No jobs found matching your criteria</div></div>');
+      return;
+    }
+
+    list.forEach(job => {
+      const company = getCompanyByUserId(job.userId);
+      const badgeClass = {
+        'Full-Time': 'bg-success',
+        'Part-Time': 'bg-secondary',
+        'Internship': 'bg-warning'
+      }[job.jobType] || 'bg-dark';
+
+      const card = `
+        <div class="col">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body">
+              <h5 class="card-title">${job.name || 'No title'}</h5>
+              <h6 class="card-subtitle mb-2 text-muted">
+                ${company.name || company.Name || 'Unknown company'} — ${job.location || 'Remote'}
+              </h6>
+              <span class="badge ${badgeClass} mb-2">${job.jobType || 'Unknown type'}</span>
+              <p class="card-text">${job.description || 'No description provided'}</p>
+              <button class="btn btn-outline-primary apply-btn" data-job-id="${job.jobId}" data-bs-toggle="modal" data-bs-target="#applyModal">
+                Apply Now
+              </button>
+            </div>
+          </div>
+        </div>`;
+      $row.append(card);
+    });
+  }
+
+  // Filter logic
+  $('#filterForm').on('submit', function (e) {
+    e.preventDefault();
+    const keyword = $('#searchInput').val().toLowerCase();
+    const location = $('#locationInput').val().toLowerCase();
+    const type = $('#jobTypeFilter').val();
+
+    const filtered = jobs.filter(job => {
+      const matchesKeyword = !keyword ||
+        (job.name && job.name.toLowerCase().includes(keyword)) ||
+        (job.description && job.description.toLowerCase().includes(keyword));
+
+      const matchesLocation = !location ||
+        (job.location && job.location.toLowerCase().includes(location));
+
+      const matchesType = !type || job.jobType === type;
+
+      return matchesKeyword && matchesLocation && matchesType;
+    });
+
+    renderJobs(filtered);
+  });
+
+  // Apply Modal logic
+  $(document).on('click', '.apply-btn', function () {
+    const jobId = $(this).data('job-id');
+    $('#selectedJobId').val(jobId);
+    $('#linkedinId').val('').focus();
+  });
+
+  $('#applyForm').on('submit', function (e) {
+    e.preventDefault();
+    const submitBtn = $('#submitBtn');
+    submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status"></span> Applying...');
+
+    const jobId = parseInt($('#selectedJobId').val());
+    const linkedIn = $('#linkedinId').val().trim();
+    const currentUserId = parseInt(localStorage.getItem("userId"));
+
+    // Validation
+    if (!currentUserId || isNaN(currentUserId)) {
+      showToast("Invalid user session. Please login again.", true);
+      window.location.href = "login.html";
+      submitBtn.prop('disabled', false).text('Submit Application');
+      return;
+    }
+
+    if (isNaN(jobId)) {
+      showToast("Invalid job selected. Please try again.", true);
+      submitBtn.prop('disabled', false).text('Submit Application');
+      return;
+    }
+
+    if (!linkedIn) {
+      showToast("Please enter your LinkedIn ID.", true);
+      submitBtn.prop('disabled', false).text('Submit Application');
+      return;
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const newApplication = {
+      userId: currentUserId,
+      jobId: jobId,
+      linkedInID: linkedIn,
+      applyDate: today,
+      status: "Pending"
+    };
+
+    console.log("Submitting application:", newApplication);
+
+    fetch('http://localhost:8080/api/applications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newApplication)
+    })
+      .then(response => {
+        if (!response.ok) {
+          if (response.status === 409) { // Conflict status
+            return response.text().then(err => {
+              throw new Error("You've already applied to this job");
+            });
+          }
+          return response.text().then(err => {
+            throw new Error(err || 'Application failed');
+          });
+        }
+        return response.json();
+      })
+      .then(data => {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('applyModal'));
+        modal.hide();
+        showToast("Application submitted successfully!");
+
+        setTimeout(() => {
+          location.reload();
+        }, 1000); // 1000ms = 1 second delay
+      })
+      .catch(err => {
+        console.error("Application submission failed:", err);
+        showToast(err.message || "Failed to submit application", true);
+      })
+      .finally(() => {
+        submitBtn.prop('disabled', false).text('Submit Application');
+      });
+  });
+
+  $(document).ready(function () {
+    loadData();
+  });
+</script>

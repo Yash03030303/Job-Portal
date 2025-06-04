@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Job Type Statistics</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body style="font-family: 'Arial', sans-serif; background: #f4f6f8; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center;">
+
+  <h2 style="color: #2c3e50; margin-top: 40px; font-size: 2rem;">Job Type Statistics</h2>
+
+  <div style="background: #fff; padding: 30px; margin: 30px auto; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); max-width: 800px; width: 90%;">
+    <canvas id="pieChart" style="width: 100%; height: auto;"></canvas>
+    <button onclick="downloadChart()" style="margin-top: 20px; padding: 10px 20px; background-color: #2c3e50; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem;">Download Chart</button>
+  </div>
+
+  <script>
+    const userId = localStorage.getItem("userId");
+    if (!userId) {
+      alert("Unauthorized. Please log in first.");
+      window.location.href = "login.html";
+    }
+
+    fetch('http://localhost:8080/api/postjob')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error("Network response was not ok");
+        }
+        return response.json();
+      })
+      .then(jobs => {
+        const companyJobs = jobs.filter(job => String(job.userId) === String(userId));
+
+        const jobTypeCounts = {};
+        companyJobs.forEach(job => {
+          jobTypeCounts[job.jobType] = (jobTypeCounts[job.jobType] || 0) + 1;
+        });
+
+        const generateRandomColor = () => {
+          const letters = '0123456789ABCDEF';
+          let color = '#';
+          for (let i = 0; i < 6; i++) {
+            color += letters[Math.floor(Math.random() * 16)];
+          }
+          return color;
+        };
+
+        const pieChartLabels = Object.keys(jobTypeCounts);
+        const pieChartData = Object.values(jobTypeCounts);
+
+        const pieCtx = document.getElementById('pieChart').getContext('2d');
+        window.pieChartInstance = new Chart(pieCtx, {
+          type: 'pie',
+          data: {
+            labels: pieChartLabels,
+            datasets: [{
+              label: 'Job Type Count',
+              data: pieChartData,
+              backgroundColor: pieChartLabels.map(generateRandomColor)
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: {
+                position: 'bottom'
+              },
+              title: {
+                display: true,
+                text: 'Job Types Distribution (Your Jobs)'
+              }
+            }
+          }
+        });
+      })
+      .catch(error => console.error('Error fetching data:', error));
+
+    function downloadChart() {
+      const link = document.createElement('a');
+      link.download = 'job_type_chart.png';
+      link.href = document.getElementById('pieChart').toDataURL('image/png');
+      link.click();
+    }
+  </script>
+</body>
+</html>

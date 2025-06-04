@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Job Applications</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .badge-pending { background-color: #ffc107; color: #000; }
+    .badge-shortlisted { background-color: #198754; }
+    .badge-rejected { background-color: #dc3545; }
+    .application-card { margin-bottom: 1.5rem; }
+  </style>
+</head>
+<body class="container my-5">
+
+  <h2 class="mb-4">Received Applications</h2>
+
+  <div class="d-flex justify-content-end mb-3">
+    <button id="exportCSVBtn" class="btn btn-outline-primary">Export as CSV</button>
+  </div>
+
+  <div id="applicationsContainer"></div>
+
+  <!-- Status Update Toast -->
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="statusToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="toast-header">
+        <strong class="me-auto">Notification</strong>
+        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+      <div class="toast-body" id="toastMessage"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Initialize toast
+    const statusToast = new bootstrap.Toast(document.getElementById('statusToast'));
+    const loggedInUserId = localStorage.getItem("userId");
+
+    async function loadApplications() {
+      try {
+        const response = await fetch(`http://localhost:8080/api/applications/app/${loggedInUserId}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to load applications');
+        }
+        
+        const applications = await response.json();
+        renderApplications(applications);
+        
+      } catch (error) {
+        console.error("Error loading applications:", error);
+        document.getElementById("applicationsContainer").innerHTML = `
+          <div class="alert alert-danger">Error loading applications: ${error.message}</div>`;
+      }
+    }
+
+    function renderApplications(applications) {
+      const container = document.getElementById("applicationsContainer");
+      
+      if (!applications || applications.length === 0) {
+        container.innerHTML = `<div class="alert alert-info">No applications found.</div>`;
+        document.getElementById("exportCSVBtn").style.display = 'none';
+        return;
+      }
+
+      // Build HTML table with job title column
+      let html = `
+        <div class="card mb-4">
+          <div class="card-header">
+            <strong>All Applications</strong> (${applications.length} total)
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-striped mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Job Title</th>
+                  <th>Candidate Name</th>
+                  <th>Email</th>
+                  <th>Status</th>
+                  <th>Applied On</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${applications.map(app => `
+                  <tr data-app-id="${app.id}">
+                    <td>${app.jobTitle || 'N/A'}</td>
+                    <td>${app.name || 'N/A'}</td>
+                    <td>${app.email || 'N/A'}</td>
+                    <td><span class="badge badge-${app.status.toLowerCase()}">${app.status}</span></td>
+                    <td>${formatDate(app.applyDate) || 'N/A'}</td>
+                    <td>
+                      ${app.status === 'Pending' ? `
+                        <button class="btn btn-sm btn-success me-1 shortlist-btn">Shortlist</button>
+                        <button class="btn btn-sm btn-danger reject-btn">Reject</button>
+                      ` : ''}
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      container.innerHTML = html;
+      
+      // Set up event listeners
+      document.querySelectorAll('.shortlist-btn, .reject-btn').forEach(button => {
+        button.addEventListener('click', async function() {
+          const row = this.closest('tr');
+          const appId = row.getAttribute('data-app-id');
+          const newStatus = this.classList.contains('shortlist-btn') ? 'Shortlisted' : 'Rejected';
+          
+          try {
+            // Update UI
+            const statusBadge = row.querySelector('.badge');
+            statusBadge.textContent = newStatus;
+            statusBadge.className = `badge badge-${newStatus.toLowerCase()}`;
+            row.querySelectorAll('button').forEach(btn => btn.remove());
+            
+            // Update backend
+            const response = await fetch(`http://localhost:8080/api/applications/${appId}/status?status=${newStatus}`, {
+              method: 'PATCH'
+            });
+            
+            if (!response.ok) {
+              throw new Error('Failed to update status');
+            }
+            
+            showToast(`Status updated to ${newStatus}`);
+          } catch (error) {
+            console.error('Error updating status:', error);
+            showToast('Failed to update status', true);
+          }
+        });
+      });
+    }
+
+    function formatDate(dateString) {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      return date.toLocaleDateString();
+    }
+
+    function showToast(message, isError = false) {
+      const toastBody = document.getElementById('toastMessage');
+      toastBody.textContent = message;
+      toastBody.className = isError ? 'toast-body text-danger' : 'toast-body text-success';
+      statusToast.show();
+    }
+
+    // Export to CSV
+    document.getElementById('exportCSVBtn').addEventListener('click', async () => {
+      try {
+        const response = await fetch(`http://localhost:8080/api/applications/app/${loggedInUserId}`);
+        if (!response.ok) throw new Error('Failed to load data for export');
+        
+        const applications = await response.json();
+        
+        if (!applications || applications.length === 0) {
+          showToast('No applications to export', true);
+          return;
+        }
+        
+        const headers = ['Job Title', 'Candidate Name', 'Email', 'Status', 'Applied Date'];
+        const rows = [headers.join(',')];
+        
+        applications.forEach(app => {
+          rows.push([
+            `"${app.jobTitle || 'N/A'}"`,
+            `"${app.name || 'N/A'}"`,
+            `"${app.email || 'N/A'}"`,
+            `"${app.status}"`,
+            `"${formatDate(app.applyDate) || 'N/A'}"`
+          ].join(','));
+        });
+        
+        const csv = rows.join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `applications_${new Date().toISOString().slice(0,10)}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showToast('Export completed successfully');
+      } catch (error) {
+        console.error('Export failed:', error);
+        showToast('Export failed: ' + error.message, true);
+      }
+    });
+
+    // Load applications on page load
+    if (loggedInUserId) {
+      loadApplications();
+    } else {
+      document.getElementById("applicationsContainer").innerHTML = `
+        <div class="alert alert-danger">Please login to view applications.</div>`;
+    }
+  </script>
+</body>
+</html>

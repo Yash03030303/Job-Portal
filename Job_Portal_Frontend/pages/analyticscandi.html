@@ -1,0 +1,93 @@
+<h2 class="mt-5 mb-4 text-center">📍 Jobs Available by Location</h2>
+<div class="card shadow p-4">
+  <canvas id="jobsLocationChart" height="300"></canvas>
+  <button onclick="downloadChart()" style="margin-top: 20px; padding: 10px 20px; background-color: #2c3e50; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem;"><i class="fas fa-download"></i> Download Chart</button>
+</div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+  async function drawLocationChart() {
+    try {
+      // Fetch data from Spring Boot backend instead of JSON file
+      const res = await fetch('http://localhost:8080/api/postjob/by-location');
+      const locationCount = await res.json();
+
+      const locations = Object.keys(locationCount);
+      const counts = Object.values(locationCount);
+
+      // Dynamic colors
+      const backgroundColors = [
+        '#4e79a7', '#f28e2b', '#e15759', '#76b7b2',
+        '#59a14f', '#edc948', '#b07aa1', '#ff9da7'
+      ];
+
+      // Render the chart
+      const ctx = document.getElementById('jobsLocationChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: locations,
+          datasets: [{
+            label: 'Jobs Count',
+            data: counts,
+            backgroundColor: backgroundColors.slice(0, locations.length),
+            borderRadius: 8,
+            barPercentage: 0.6
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: context => ` ${context.parsed.y} jobs`
+              }
+            },
+            title: {
+              display: true,
+              text: 'Job Distribution by Location',
+              font: { size: 18 }
+            }
+          },
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: 'Location',
+                font: { size: 14 }
+              }
+            },
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: 'Number of Jobs',
+                font: { size: 14 }
+              },
+              ticks: {
+                stepSize: 1
+              }
+            }
+          }
+        }
+      });
+    } catch (err) {
+      console.error("Error loading chart data:", err);
+      // Optional: Display error message to user
+      document.getElementById('jobsLocationChart').closest('.card')
+        .innerHTML = '<div class="alert alert-danger">Failed to load job location data</div>';
+    }
+  }
+
+  drawLocationChart();
+
+  function downloadChart() {
+      const link = document.createElement('a');
+      link.download = 'job_location_chart.png';
+      link.href = document.getElementById('jobsLocationChart').toDataURL('image/png');
+      link.click();
+    }
+</script>

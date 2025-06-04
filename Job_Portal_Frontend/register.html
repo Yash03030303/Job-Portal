@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Register</title>
+  <link rel="stylesheet" href="css/bootstrap.min.css" />
+  <style>
+    .error-field {
+      border-color: #dc3545 !important;
+    }
+    .error-message {
+      color: #dc3545;
+      font-size: 0.875em;
+      margin-top: 0.25rem;
+    }
+    .success-message {
+      color: #198754;
+      font-size: 0.875em;
+      margin-top: 0.25rem;
+    }
+  </style>
+</head>
+<body class="bg-light d-flex align-items-center justify-content-center vh-100">
+  <div class="card shadow-lg p-4" style="min-width: 350px; max-width: 500px; width: 100%;">
+    <h2 class="text-center mb-4">Register</h2>
+    <form id="registerForm" novalidate>
+      <div class="mb-3">
+        <label for="userType" class="form-label">User Type</label>
+        <select id="userType" class="form-select" required>
+          <option value="">Select user type</option>
+          <option value="ADMIN">Company</option>
+          <option value="USER">User</option>
+        </select>
+      </div>
+
+      <!-- ADMIN Fields -->
+      <div class="d-none" id="adminFields">
+        <div class="mb-3">
+          <label for="adminName" class="form-label">Company Name</label>
+          <input type="text" class="form-control" id="adminName" placeholder="Enter company name" minlength="5" required />
+          <div class="invalid-feedback">Company name must be at least 5 characters.</div>
+        </div>
+        <div class="mb-3">
+          <label for="adminPhone" class="form-label">Phone Number</label>
+          <input type="tel" class="form-control" id="adminPhone" placeholder="Enter phone number" required />
+          <div class="invalid-feedback">Please provide a valid phone number.</div>
+        </div>
+        <div class="mb-3">
+          <label for="companyLocation" class="form-label">Company Location</label>
+          <input type="text" class="form-control" id="companyLocation" placeholder="Enter location" />
+        </div>
+      </div>
+
+      <!-- USER Fields -->
+      <div class="d-none" id="userFields">
+        <div class="mb-3">
+          <label for="userName" class="form-label">User Name</label>
+          <input type="text" class="form-control" id="userName" placeholder="Enter your name" minlength="5" required />
+          <div class="invalid-feedback">User name must be at least 5 characters.</div>
+        </div>
+        <div class="mb-3">
+          <label for="userPhone" class="form-label">Phone Number</label>
+          <input type="tel" class="form-control" id="userPhone" placeholder="Enter phone number" required />
+          <div class="invalid-feedback">Please provide a valid phone number.</div>
+        </div>
+        <div class="mb-3">
+          <label for="userLocation" class="form-label">User Location</label>
+          <input type="text" class="form-control" id="userLocation" placeholder="Enter location" />
+        </div>
+      </div>
+
+      <!-- Common Fields -->
+      <div class="mb-3">
+        <label for="email" class="form-label">Email address</label>
+        <input type="email" class="form-control" id="email" placeholder="Enter email" required />
+        <div class="invalid-feedback">Please provide a valid email address.</div>
+        <div id="emailError" class="error-message"></div>
+      </div>
+
+      <div class="mb-3">
+        <label for="password" class="form-label">Password</label>
+        <input type="password" class="form-control" id="password" placeholder="Enter password" minlength="6" required />
+        <div class="invalid-feedback">Password must be at least 6 characters with letters and numbers.</div>
+      </div>
+
+      <div class="d-grid">
+        <button type="submit" class="btn btn-primary" id="submitBtn">Register</button>
+      </div>
+
+      <div id="message" class="mt-2 text-center"></div>
+    </form>
+
+    <p class="mt-3 text-center">
+      Already have an account? <a href="login.html">Login</a>
+    </p>
+  </div>
+
+  <script>
+    const API = "http://localhost:8080/api";
+    const REGISTER_API = "http://localhost:8080/api/register";
+    const userTypeSelect = document.getElementById("userType");
+    const adminFields = document.getElementById("adminFields");
+    const userFields = document.getElementById("userFields");
+    const message = document.getElementById("message");
+    const emailInput = document.getElementById("email");
+    const emailError = document.getElementById("emailError");
+    const submitBtn = document.getElementById("submitBtn");
+
+    // Show/hide fields based on user type
+    userTypeSelect.addEventListener("change", () => {
+      const selected = userTypeSelect.value;
+
+      if (selected === "ADMIN") {
+        adminFields.classList.remove("d-none");
+        userFields.classList.add("d-none");
+      } else if (selected === "USER") {
+        userFields.classList.remove("d-none");
+        adminFields.classList.add("d-none");
+      } else {
+        adminFields.classList.add("d-none");
+        userFields.classList.add("d-none");
+      }
+    });
+
+    // Email availability check on blur
+    emailInput.addEventListener('blur', checkEmailAvailability);
+
+    async function checkEmailAvailability() {
+      const email = emailInput.value.trim();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      
+      if (!emailRegex.test(email)) {
+        return; // Skip if email is invalid
+      }
+
+      try {
+        const response = await fetch(`${API}/check-email?email=${encodeURIComponent(email)}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          showEmailError(errorData.message || 'Email is already in use');
+        } else {
+          clearEmailError();
+        }
+      } catch (error) {
+        console.error('Email check error:', error);
+      }
+    }
+
+    function showEmailError(msg) {
+      emailInput.classList.add('error-field');
+      emailError.textContent = msg;
+      submitBtn.disabled = true;
+    }
+
+    function clearEmailError() {
+      emailInput.classList.remove('error-field');
+      emailError.textContent = '';
+      submitBtn.disabled = false;
+    }
+
+    // Form submission
+    document.getElementById("registerForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      registerUser();
+    });
+
+    async function registerUser() {
+      const form = document.getElementById("registerForm");
+      
+      if (!form.checkValidity()) {
+        form.classList.add('was-validated');
+        return;
+      }
+
+      const userType = userTypeSelect.value;
+      const email = emailInput.value.trim();
+      const password = document.getElementById("password").value;
+
+      message.textContent = "";
+      message.className = "mt-2 text-center";
+
+      let name, phone, location;
+
+      if (userType === "ADMIN") {
+        name = document.getElementById("adminName").value.trim();
+        phone = document.getElementById("adminPhone").value.trim();
+        location = document.getElementById("companyLocation").value.trim();
+      } else {
+        name = document.getElementById("userName").value.trim();
+        phone = document.getElementById("userPhone").value.trim();
+        location = document.getElementById("userLocation").value.trim();
+      }
+
+      const newUser = {
+        name,
+        phone,
+        location: location || "Unknown",
+        email,
+        password,
+        userType
+      };
+
+      try {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Registering...';
+
+        const response = await fetch(REGISTER_API, {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify(newUser)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || `Registration failed (${response.status})`);
+        }
+
+        const data = await response.json();
+        showSuccessMessage("Registration successful! Redirecting to login...");
+        setTimeout(() => {
+          window.location.href = "login.html";
+        }, 2000);
+      } catch (err) {
+        console.error("Registration Error:", err);
+        showErrorMessage(err.message || "Registration failed. Please try again.");
+        
+        // Special handling for duplicate email
+        if (err.message.toLowerCase().includes('email') || 
+            err.message.toLowerCase().includes('duplicate')) {
+          showEmailError(err.message);
+        }
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Register';
+      }
+    }
+
+    function showSuccessMessage(msg) {
+      message.textContent = msg;
+      message.classList.add('success-message');
+      message.classList.remove('error-message');
+    }
+
+    function showErrorMessage(msg) {
+      message.textContent = msg;
+      message.classList.add('error-message');
+      message.classList.remove('success-message');
+    }
+  </script>
+</body>
+</html>
