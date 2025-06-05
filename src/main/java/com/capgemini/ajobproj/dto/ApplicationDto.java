@@ -1,6 +1,5 @@
 package com.capgemini.ajobproj.dto;
 
-
 import lombok.*;
 
 @Getter 
