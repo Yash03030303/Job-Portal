@@ -1,6 +1,6 @@
 # Job Portal
 
-A web-based platform designed to connect job seekers with employers, facilitating job searches, applications, and recruitment processes.
+A web-based platform designed to connect job seekers with employers, facilitating job searches, applications and recruitment processes.
 
 ## 🚀 Features
 
@@ -11,16 +11,16 @@ A web-based platform designed to connect job seekers with employers, facilitatin
   Employers can post detailed job openings with requirements and deadlines.
 
 - **Job Search & Filtering**  
-  Job seekers can search and filter jobs by location, type, and industry.
+  Job seekers can search and filter jobs by location, type and industry.
 
 - **Application Management**  
-  Job seekers can apply for jobs, and employers can review, shortlist, and manage applications.
+  Job seekers can apply for jobs, and employers can review, shortlist and manage applications.
 
 - **User Profiles**  
-  Job seekers can create detailed profiles with resumes, skills, and contact info. Employers can maintain company profiles.
+  Job seekers can create detailed profiles with resumes, skills and contact info. Employers can maintain company profiles.
 
 - **Responsive Design**  
-  Optimized UI for desktops, tablets, and mobile devices.
+  Optimized UI for desktops, tablets and mobile devices.
 
 ## 🛠️ Tech Stack
 
