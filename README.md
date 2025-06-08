@@ -28,7 +28,7 @@ A web-based platform designed to connect job seekers with employers, facilitatin
 - **Backend**: Java, Spring Boot
 - **Database**: MySQL
 - **API Testing**: Postman
-- **Version Control**: Git
+- **Version Control**: Git, GitHub
 
 ## 📦 Installation & Setup
 
